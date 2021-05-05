@@ -74,8 +74,21 @@ class FullyConnectedNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        # basic
+        prev_dim = input_dim
+        for idx in range(1, self.num_layers):
+            next_dim = hidden_dims[idx-1]
+            self.params[f"W{idx}"] = 2 * np.random.randn(prev_dim, next_dim)/np.sqrt(prev_dim)
+            # self.params[f"W{idx}"] = 0.01 * np.random.randn(prev_dim,next_dim)
+            self.params[f"b{idx}"] = np.zeros(next_dim)
+            prev_dim = next_dim
 
+        self.params[f"W{self.num_layers}"] = 2 * np.random.randn(prev_dim, num_classes)/np.sqrt(prev_dim)
+        # self.params[f"W{self.num_layers}"] = 0.01 * np.random.randn(prev_dim,num_classes)
+        self.params[f"b{self.num_layers}"] = np.zeros(num_classes)
+
+        # batch normalization
+    
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
@@ -148,7 +161,14 @@ class FullyConnectedNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        # basic
+        batch_size = X.shape[0]
+        data = {"X1": X.reshape((batch_size,-1))}
+        for idx in range(1, self.num_layers):
+            data[f"Y{idx}"] = np.dot(data[f"X{idx}"], self.params[f"W{idx}"]) + self.params[f"b{idx}"]
+            data[f"X{idx+1}"] = np.maximum(0, data[f"Y{idx}"])
+
+        scores = np.dot(data[f"X{self.num_layers}"], self.params[f"W{self.num_layers}"]) + self.params[f"b{self.num_layers}"]
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -175,7 +195,23 @@ class FullyConnectedNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        # basic
+        scores -= np.max(scores, axis=1, keepdims=True)
+        exp_scores = np.exp(scores)
+        probs = exp_scores / np.sum(exp_scores, axis=1, keepdims=True)
+        data_loss = np.sum(-np.log(probs[range(batch_size), y])) / batch_size
+        reg_loss = sum([0.5*self.reg*np.sum(self.params[f"W{i+1}"]*self.params[f"W{i+1}"]) for i in range(self.num_layers)])
+
+        loss = data_loss + reg_loss
+
+        dX = probs  # dscores parametrized
+        dX[range(batch_size),y] -= 1
+        dX /= batch_size
+        for idx in range(self.num_layers, 0, -1):
+            grads[f"W{idx}"] = np.dot(data[f"X{idx}"].T, dX) + self.reg * self.params[f"W{idx}"]
+            grads[f"b{idx}"] = np.sum(dX, axis = 0)
+            dX = np.dot(dX, self.params[f"W{idx}"].T)
+            dX[data[f"X{idx}"] <= 0] = 0
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
