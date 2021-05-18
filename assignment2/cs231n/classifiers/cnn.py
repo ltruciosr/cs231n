@@ -26,6 +26,8 @@ class ThreeLayerConvNet(object):
         num_classes=10,
         weight_scale=1e-3,
         reg=0.0,
+        weight_init="constant",
+        debug=False,
         dtype=np.float32,
     ):
         """
@@ -45,6 +47,7 @@ class ThreeLayerConvNet(object):
         self.params = {}
         self.reg = reg
         self.dtype = dtype
+        self.debug = debug
 
         ############################################################################
         # TODO: Initialize weights and biases for the three-layer convolutional    #
@@ -63,7 +66,44 @@ class ThreeLayerConvNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        conv_dim = int((input_dim[1] / 2) * (input_dim[2] / 2))
+        
+        if weight_init == "constant":
+            self.params["W1"] = weight_scale * np.random.randn(
+                num_filters, input_dim[0], filter_size, filter_size
+            )
+            self.params["b1"] = np.zeros(num_filters)
+
+            self.params["W2"] = weight_scale * np.random.randn(
+                num_filters * conv_dim, hidden_dim
+            )
+            self.params["b2"] = np.zeros(hidden_dim)
+
+            self.params["W3"] = weight_scale * np.random.randn(hidden_dim, num_classes)
+            self.params["b3"] = np.zeros(num_classes)
+
+        # He initialization
+
+        elif weight_init == "he":
+            self.params["W1"] = np.random.randn(
+                num_filters, input_dim[0], filter_size, filter_size
+            ) / np.sqrt(input_dim[0] * filter_size * filter_size / 2)
+            self.params["b1"] = np.zeros(num_filters)
+
+            self.params["W2"] = np.random.randn(
+                num_filters * conv_dim, hidden_dim
+            ) / np.sqrt(num_filters * conv_dim / 2)
+            self.params["b2"] = np.zeros(hidden_dim)
+
+            self.params["W3"] = np.random.randn(hidden_dim, num_classes) / np.sqrt(
+                hidden_dim / 2
+            )
+            self.params["b3"] = np.zeros(num_classes)
+
+        if self.debug:
+            for i in range(0, 3):
+                print("W{} shape: {}".format(i + 1, self.params[f"W{i+1}"].shape))
+                print("b{} shape: {}".format(i + 1, self.params[f"b{i+1}"].shape))
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -102,7 +142,17 @@ class ThreeLayerConvNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        out_conv, cache_layer1 = conv_relu_pool_forward(
+            X, W1, b1, conv_param, pool_param
+        )
+
+        out, cache_layer2 = affine_relu_forward(out_conv, W2, b2)
+        scores, cache_layer3 = affine_forward(out, W3, b3)
+
+        if self.debug:
+            print("x_cnn: {}".format(out_conv.shape))
+            print("x_fc: {}".format(out.shape))
+            print("scores: {}".format(scores.shape))
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -125,8 +175,15 @@ class ThreeLayerConvNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        loss, dout = softmax_loss(scores, y)
+        dout, grads["W3"], grads["b3"] = affine_backward(dout, cache_layer3)
+        dout, grads["W2"], grads["b2"] = affine_relu_backward(dout, cache_layer2)
+        dout, grads["W1"], grads["b1"] = conv_relu_pool_backward(
+            dout.reshape(out_conv.shape), cache_layer1
+        )
 
+        for i in range(0, 3):
+            grads[f"W{i+1}"] += self.reg * self.params[f"W{i+1}"]
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
